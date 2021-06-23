@@ -1,36 +1,29 @@
 package com.udacity.project4.locationreminders.reminderslist
 
-import android.content.Context
 import android.os.Bundle
 import android.view.View
-import android.view.ViewGroup
+import androidx.annotation.NonNull
 import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.navigation.NavController
 import androidx.navigation.Navigation
-import androidx.test.core.app.ApplicationProvider
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ApplicationProvider.getApplicationContext
-import androidx.test.espresso.Espresso.onData
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions
-import androidx.test.espresso.contrib.RecyclerViewActions
-import androidx.test.espresso.intent.matcher.BundleMatchers.hasEntry
-import androidx.test.espresso.matcher.ViewMatchers
+import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.BoundedMatcher
 import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.MediumTest
 import com.udacity.project4.FakeDataSource
 import com.udacity.project4.R
 import com.udacity.project4.locationreminders.data.dto.ReminderDTO
-import com.udacity.project4.locationreminders.data.dto.Result
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runBlockingTest
 import org.hamcrest.CoreMatchers.*
 import org.hamcrest.Description
 import org.hamcrest.Matcher
-import org.hamcrest.Matchers
-import org.hamcrest.TypeSafeMatcher
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -42,6 +35,7 @@ import org.koin.dsl.module
 import org.koin.test.AutoCloseKoinTest
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+
 
 @RunWith(AndroidJUnit4::class)
 @ExperimentalCoroutinesApi
@@ -111,21 +105,6 @@ class ReminderListFragmentTest :
     fun onSaveReminder_recyclerViewShowsReminders() = runBlockingTest {
 
         // GIVEN - on the reminder list screen saving several reminders
-        val navController = mock(NavController::class.java)
-        launchFragmentInContainer<ReminderListFragment>(Bundle(), R.style.AppTheme) {
-            ReminderListFragment().also { fragment ->
-                // In addition to returning a new instance of our Fragment,
-                // get a callback whenever the fragment’s view is created
-                // or destroyed so that we can set the mock NavController
-                fragment.viewLifecycleOwnerLiveData.observeForever { viewLifecycleOwner ->
-                    if (viewLifecycleOwner != null) {
-                        // The fragment’s view has just been created
-                        Navigation.setViewNavController(fragment.requireView(), navController)
-                    }
-                }
-            }
-        }
-
         val reminderOktoberfest = ReminderDTO(
             "Oktoberfest reminder",
             "Go to the Oktoberfest!",
@@ -153,10 +132,42 @@ class ReminderListFragmentTest :
         // WHEN - tasks are added to the data source
         fakeDataSource.setTasks(list)
 
+        val navController = mock(NavController::class.java)
+        launchFragmentInContainer<ReminderListFragment>(Bundle(), R.style.AppTheme) {
+            ReminderListFragment().also { fragment ->
+                // In addition to returning a new instance of our Fragment,
+                // get a callback whenever the fragment’s view is created
+                // or destroyed so that we can set the mock NavController
+                fragment.viewLifecycleOwnerLiveData.observeForever { viewLifecycleOwner ->
+                    if (viewLifecycleOwner != null) {
+                        // The fragment’s view has just been created
+                        Navigation.setViewNavController(fragment.requireView(), navController)
+                    }
+                }
+            }
+        }
+
         // THEN - recycler view shall display them
-        
-        // TODO add test for recylcer view, but how?
-        //onView(withId(R.id.reminderssRecyclerView), )
+        onView(withId(R.id.reminderssRecyclerView))
+            .check(matches(atPosition(0, hasDescendant(withText(reminderOktoberfest.title)))))
+        onView(withId(R.id.reminderssRecyclerView))
+            .check(matches(atPosition(0, hasDescendant(withText(reminderOktoberfest.description)))))
+        onView(withId(R.id.reminderssRecyclerView))
+            .check(matches(atPosition(0, hasDescendant(withText(reminderOktoberfest.location)))))
+
+        onView(withId(R.id.reminderssRecyclerView))
+            .check(matches(atPosition(1, hasDescendant(withText(reminderMtbTrailsSintra.title)))))
+        onView(withId(R.id.reminderssRecyclerView))
+            .check(matches(atPosition(1, hasDescendant(withText(reminderMtbTrailsSintra.description)))))
+        onView(withId(R.id.reminderssRecyclerView))
+            .check(matches(atPosition(1, hasDescendant(withText(reminderMtbTrailsSintra.location)))))
+
+        onView(withId(R.id.reminderssRecyclerView))
+            .check(matches(atPosition(2, hasDescendant(withText(reminderMeetChristian.title)))))
+        onView(withId(R.id.reminderssRecyclerView))
+            .check(matches(atPosition(2, hasDescendant(withText(reminderMeetChristian.description)))))
+        onView(withId(R.id.reminderssRecyclerView))
+            .check(matches(atPosition(2, hasDescendant(withText(reminderMeetChristian.location)))))
     }
 //    DONE: add testing for the error messages.
 
@@ -184,5 +195,21 @@ class ReminderListFragmentTest :
         // THEN - No reminders found is shown
         onView(withId(R.id.noDataTextView))
             .check(ViewAssertions.matches(isDisplayed()))
+    }
+
+    private fun atPosition(position: Int, @NonNull itemMatcher: Matcher<View?>): Matcher<View?>? {
+        return object : BoundedMatcher<View?, RecyclerView>(RecyclerView::class.java) {
+            override fun describeTo(description: Description) {
+                description.appendText("has item at position $position: ")
+                itemMatcher.describeTo(description)
+            }
+
+            override fun matchesSafely(view: RecyclerView): Boolean {
+                val viewHolder = view.findViewHolderForAdapterPosition(position)
+                    ?: // has no item on such position
+                    return false
+                return itemMatcher.matches(viewHolder.itemView)
+            }
+        }
     }
 }

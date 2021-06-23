@@ -1,7 +1,6 @@
 package com.udacity.project4
 
 import android.app.Application
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider.getApplicationContext
 import androidx.test.espresso.Espresso
@@ -10,7 +9,6 @@ import androidx.test.espresso.IdlingRegistry
 import androidx.test.espresso.action.ViewActions
 import androidx.test.espresso.assertion.ViewAssertions
 import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.matcher.RootMatchers.withDecorView
 import androidx.test.espresso.matcher.ViewMatchers
 import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -24,13 +22,10 @@ import com.udacity.project4.locationreminders.data.local.RemindersLocalRepositor
 import com.udacity.project4.locationreminders.reminderslist.RemindersListViewModel
 import com.udacity.project4.locationreminders.savereminder.SaveReminderViewModel
 import com.udacity.project4.util.DataBindingIdlingResource
-import com.udacity.project4.util.EspressoIdlingResource
 import com.udacity.project4.util.monitorActivity
+import com.udacity.project4.utils.EspressoIdlingResource
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.runBlockingTest
-import org.hamcrest.CoreMatchers.not
-import org.hamcrest.core.IsNot
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -51,9 +46,10 @@ class RemindersActivityTest :
 
     private lateinit var repository: ReminderDataSource
     private lateinit var appContext: Application
-    private lateinit var reminderOktoberfest : ReminderDTO
-    private lateinit var reminderMtbTrailsSintra : ReminderDTO
-    private lateinit var reminderMeetChristian : ReminderDTO
+    private lateinit var reminderOktoberfest: ReminderDTO
+    private lateinit var reminderMtbTrailsSintra: ReminderDTO
+    private lateinit var reminderMeetChristian: ReminderDTO
+
     // An Idling Resource that waits for Data Binding to have no pending bindings
     private val dataBindingIdlingResource = DataBindingIdlingResource()
 
@@ -99,7 +95,7 @@ class RemindersActivityTest :
     }
 
     @Before
-    fun initVariables(){
+    fun initVariables() {
         reminderOktoberfest = ReminderDTO(
             "Oktoberfest reminder",
             "Go to the Oktoberfest!",
@@ -142,7 +138,16 @@ class RemindersActivityTest :
         IdlingRegistry.getInstance().unregister(dataBindingIdlingResource)
     }
 
-//    DONE: add End to End testing to the app
+    private inline fun <T> executeEspressoImmediately(function: () -> T): T {
+        IdlingRegistry.getInstance().unregister(EspressoIdlingResource.countingIdlingResource)
+        return try {
+            function()
+        } finally {
+            IdlingRegistry.getInstance().register(EspressoIdlingResource.countingIdlingResource)
+        }
+    }
+
+    //    DONE: add End to End testing to the app
     @ExperimentalCoroutinesApi
     @Test
     fun endToEnd_saveReminderWillDisplayReminder() = runBlocking {
@@ -154,38 +159,67 @@ class RemindersActivityTest :
         // click on add new reminder button
         Espresso.onView(withId(R.id.addReminderFAB)).perform(ViewActions.click())
 
-        // click on save button
-        Espresso.onView(withId(R.id.save_button)).perform(ViewActions.click())
+        // expect Snackbar is shown
+        executeEspressoImmediately {
+            // click on save button
+            Espresso.onView(withId(R.id.saveReminder)).perform(ViewActions.click())
 
-        // expect Toast is shown
-        onView(withText("Please select all fields first")).inRoot(withDecorView(not( mActivityRule.activity.window.decorView))).check(matches(isDisplayed()))
+            Espresso.onView(withId(com.google.android.material.R.id.snackbar_text))
+                .check(matches(withText(R.string.err_enter_title)))
+        }
 
         Espresso.onView(withId(R.id.reminderTitle)).perform(
-            ViewActions.typeText("TITLE1"),
+            ViewActions.typeText(reminderOktoberfest.title),
             ViewActions.closeSoftKeyboard()
         )
+
+        // expect Snackbar is shown
+        executeEspressoImmediately {
+            // click on save button
+            Espresso.onView(withId(R.id.saveReminder)).perform(ViewActions.click())
+
+            onView(withId(com.google.android.material.R.id.snackbar_text))
+                .check(matches(withText(R.string.err_enter_description)))
+        }
+
         Espresso.onView(withId(R.id.reminderDescription)).perform(
-            ViewActions.typeText("DESCRIPTION1"),
+            ViewActions.typeText(reminderOktoberfest.description),
             ViewActions.closeSoftKeyboard()
         )
 
+        // expect Snackbar is shown
+        executeEspressoImmediately {
+            // click on save button
+            Espresso.onView(withId(R.id.saveReminder)).perform(ViewActions.click())
+
+            onView(withId(com.google.android.material.R.id.snackbar_text))
+                .check(matches(withText(R.string.err_select_location)))
+        }
+
+        // select a point in Google Maps
+        Espresso.onView(withId(R.id.selectLocation)).perform(ViewActions.click())
+
+        // first select no point and expect Snackbar
+        executeEspressoImmediately {
+            Espresso.onView(withId(R.id.saveLocation)).perform(ViewActions.click())
+
+            onView(withId(com.google.android.material.R.id.snackbar_text))
+                .check(matches(withText(R.string.err_select_location)))
+        }
+
+        // select location
+        Espresso.onView(withId(R.id.map)).perform(ViewActions.click())
+
+        // save location
+        Espresso.onView(withId(R.id.saveLocation)).perform(ViewActions.click())
+
         // click on save button
-        Espresso.onView(withId(R.id.save_button)).perform(ViewActions.click())
-
-        // expect Toast is shown
-        onView(withText("Please select all fields first")).inRoot(withDecorView(not( mActivityRule.activity.window.decorView))).check(matches(isDisplayed()))
-
-        // TODO select POI in Google Maps
-
-        // click on save button
-        Espresso.onView(withId(R.id.save_button)).perform(ViewActions.click())
+        Espresso.onView(withId(R.id.saveReminder)).perform(ViewActions.click())
 
         Espresso.onView(withId(R.id.title))
             .check(ViewAssertions.matches(ViewMatchers.withText(reminderOktoberfest.title)))
         Espresso.onView(withId(R.id.description))
             .check(ViewAssertions.matches(ViewMatchers.withText(reminderOktoberfest.description)))
-        Espresso.onView(withId(R.id.location))
-            .check(ViewAssertions.matches(ViewMatchers.withText(reminderOktoberfest.location)))
 
         // Make sure the activity is closed before resetting the db:
         activityScenario.close()

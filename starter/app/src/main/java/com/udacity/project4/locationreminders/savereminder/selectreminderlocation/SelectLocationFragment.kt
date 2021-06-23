@@ -2,9 +2,8 @@ package com.udacity.project4.locationreminders.savereminder.selectreminderlocati
 
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.annotation.TargetApi
-import android.app.Activity
-import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.content.res.Resources
@@ -13,12 +12,9 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.*
-import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.databinding.DataBindingUtil
-import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.*
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -26,7 +22,6 @@ import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.*
-import com.google.android.material.snackbar.Snackbar
 import com.udacity.project4.R
 import com.udacity.project4.base.BaseFragment
 import com.udacity.project4.base.NavigationCommand
@@ -34,6 +29,7 @@ import com.udacity.project4.databinding.FragmentSelectLocationBinding
 import com.udacity.project4.locationreminders.savereminder.SaveReminderViewModel
 import com.udacity.project4.utils.setDisplayHomeAsUpEnabled
 import org.koin.android.ext.android.inject
+import java.util.*
 
 class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
 
@@ -43,13 +39,13 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
     private lateinit var map: GoogleMap
     private lateinit var pointOfInterest: PointOfInterest
 
-    private val REQUEST_CODE_LOCATION_PERMISSION = 1
-    private val REQUEST_CODE_BACKGROUND_LOCATION = 2
+    private val runningQOrLater = android.os.Build.VERSION.SDK_INT >=
+            android.os.Build.VERSION_CODES.Q
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View? {
-        Log.i("SelectLocationFragment", "onCreateView called.")
+        Log.i(TAG, "onCreateView called.")
 
         binding =
             DataBindingUtil.inflate(inflater, R.layout.fragment_select_location, container, false)
@@ -70,7 +66,7 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         mapFragment.getMapAsync(this)
 
 //        TODO: call this function after the user confirms on the selected location
-        binding.saveButton.setOnClickListener { onLocationSelected() }
+        binding.saveLocation.setOnClickListener { onLocationSelected() }
 
         return binding.root
     }
@@ -80,7 +76,7 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         //         send back the selected location details to the view model
         //         and navigate back to the previous fragment to save the reminder and add the geofence
         if (this::pointOfInterest.isInitialized) {
-            Log.i("SelectLocationFragment", "Successfully selected location.")
+            Log.i(TAG, "Successfully selected location.")
             _viewModel.latitude.value = pointOfInterest.latLng.latitude
             _viewModel.longitude.value = pointOfInterest.latLng.longitude
             _viewModel.reminderSelectedLocationStr.value = pointOfInterest.name
@@ -88,8 +84,8 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
             _viewModel.navigationCommand.value =
                 NavigationCommand.To(SelectLocationFragmentDirections.actionSelectLocationFragmentToSaveReminderFragment())
         } else {
-            Log.i("SelectLocationFragment", "Location has not yet been selected.")
-            _viewModel.showToast.postValue("Please select a location")
+            Log.i(TAG, "Location has not yet been selected.")
+            _viewModel.showSnackBar.postValue(getString(R.string.err_select_location))
         }
     }
 
@@ -102,41 +98,41 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         // TODO: Change the map type based on the user's selection.
         R.id.normal_map -> {
             if (this::map.isInitialized) {
-                Log.i("SelectLocationFragment", "Normal map type selected.")
+                Log.i(TAG, "Normal map type selected.")
                 map.mapType = GoogleMap.MAP_TYPE_NORMAL
                 true
             } else {
-                Log.w("SelectLocationFragment", "Map has not yet been initialized.")
+                Log.w(TAG, "Map has not yet been initialized.")
                 false
             }
         }
         R.id.hybrid_map -> {
             if (this::map.isInitialized) {
-                Log.i("SelectLocationFragment", "Hybrid map type selected.")
+                Log.i(TAG, "Hybrid map type selected.")
                 map.mapType = GoogleMap.MAP_TYPE_HYBRID
                 true
             } else {
-                Log.w("SelectLocationFragment", "Map has not yet been initialized.")
+                Log.w(TAG, "Map has not yet been initialized.")
                 false
             }
         }
         R.id.satellite_map -> {
             if (this::map.isInitialized) {
-                Log.i("SelectLocationFragment", "Satellite map type selected.")
+                Log.i(TAG, "Satellite map type selected.")
                 map.mapType = GoogleMap.MAP_TYPE_SATELLITE
                 true
             } else {
-                Log.w("SelectLocationFragment", "Map has not yet been initialized.")
+                Log.w(TAG, "Map has not yet been initialized.")
                 false
             }
         }
         R.id.terrain_map -> {
             if (this::map.isInitialized) {
-                Log.i("SelectLocationFragment", "Terrain map type selected.")
+                Log.i(TAG, "Terrain map type selected.")
                 map.mapType = GoogleMap.MAP_TYPE_TERRAIN
                 true
             } else {
-                Log.w("SelectLocationFragment", "Map has not yet been initialized.")
+                Log.w(TAG, "Map has not yet been initialized.")
                 false
             }
         }
@@ -155,14 +151,14 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
      */
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onMapReady(googleMap: GoogleMap) {
-        Log.i("SelectLocationFragment", "Map is ready.")
+        Log.i(TAG, "Map is ready.")
 
         map = googleMap
 
         //Default location
         val latitude = 48.09314459611282
         val longitude = 11.53787488905538
-        val zoomLevel = 20f
+        val zoomLevel = 15f
         val munich = LatLng(latitude, longitude)
         map.moveCamera(CameraUpdateFactory.newLatLngZoom(munich, zoomLevel))
 
@@ -171,8 +167,9 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         map.moveCamera(CameraUpdateFactory.newLatLngZoom(homeLatLng, zoomLevel))
 
         setPoiClickListener(map)
-        //setMapStyle(map)
-        enableMyLocation()
+        setOnMapClickListener(map)
+        setMapStyle(map)
+        checkPermissionsAndEnableMyLocation()
     }
 
     private fun setMapStyle(map: GoogleMap) {
@@ -186,15 +183,15 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
                 )
             )
             if (!success) {
-                Log.e("SelectLocationFragment", "Style parsing failed.")
+                Log.e(TAG, "Style parsing failed.")
             }
         } catch (e: Resources.NotFoundException) {
-            Log.e("SelectLocationFragment", "Can't find style. Error: ", e)
+            Log.e(TAG, "Can't find style. Error: ", e)
         }
     }
 
     private fun setPoiClickListener(map: GoogleMap) {
-        Log.i("SelectLocationFragment", "Setting POI click listener.")
+        Log.i(TAG, "Setting POI click listener.")
 
         map.setOnPoiClickListener { poi ->
 
@@ -218,75 +215,135 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
+
+    private fun setOnMapClickListener(map: GoogleMap) {
+        Log.i(TAG, "Setting POI click listener.")
+
+        map.setOnMapClickListener { point ->
+
+            map.clear()
+            pointOfInterest = PointOfInterest(LatLng(point.latitude, point.longitude), UUID.randomUUID().toString(), "Point at %.2f/%.2f".format(point.latitude, point.longitude))
+
+            map.addMarker(
+                MarkerOptions()
+                    .position(pointOfInterest.latLng)
+                    .title(pointOfInterest.name)
+            ).showInfoWindow()
+
+            map.addCircle(
+                CircleOptions()
+                    .center(pointOfInterest.latLng)
+                    .radius(200.0)
+                    .strokeColor(Color.argb(255, 255, 0, 0))
+                    .fillColor(Color.argb(64, 255, 0, 0)).strokeWidth(4F)
+
+            )
+        }
+    }
+
+    /**
+     * Starts the permission check and Geofence process only if the Geofence associated with the
+     * current hint isn't yet active.
+     */
+    private fun checkPermissionsAndEnableMyLocation() {
+        Log.d(TAG, "checkPermissionsAndStartGooglemap")
+        if (foregroundLocationPermissionApproved()) {
+            Log.i(TAG, "foreground and background location permission approved")
+            checkDeviceLocationSettingsAndEnableMyLocation()
+        } else {
+            Log.i(TAG, "requesting foreground and background location permission")
+            requestForegroundLocationPermissions()
+        }
+    }
+
+    /*
+     * In all cases, we need to have the location permission.  On Android 10+ (Q) we need to have
+     * the background permission as well.
+     */
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<String>,
         grantResults: IntArray
     ) {
-        // Check if location permissions are granted and if so enable the
-        // location data layer.
-        Log.i("SelectLocationFragment", "onRequestPermissionsResult is called.")
-        if (requestCode == REQUEST_CODE_LOCATION_PERMISSION || requestCode == REQUEST_CODE_BACKGROUND_LOCATION) {
-            if (grantResults.isNotEmpty() && (grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-                enableMyLocation()
-            }
-        }
-    }
+        Log.d(TAG, "onRequestPermissionResult called.")
 
-    private fun enableMyLocation() {
-        Log.i("SelectLocationFragment", "enableMyLocation is called.")
-
-        val accessFinePermissionGranted = ActivityCompat.checkSelfPermission(
-            requireContext(),
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED || ActivityCompat.checkSelfPermission(
-            requireContext(),
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (!accessFinePermissionGranted) {
-            Log.i("SelectLocationFragment", "accessFinePermission is not granted. Requesting access fine permission.")
-            requestAccessFinePermission()
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-
-            val backgroundPermissionGranted = ActivityCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.ACCESS_BACKGROUND_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-
-            if (!backgroundPermissionGranted) {
-                Log.i("SelectLocationFragment", "backgroundPermission is not granted. Requesting background permission.")
-                requestBackgroundPermission()
-            } else if (accessFinePermissionGranted) {
-                Log.i("SelectLocationFragment", "setting isMyLocationEnabled to true.")
-                map.isMyLocationEnabled = true
-            }
+        if (
+            grantResults.isEmpty() ||
+            grantResults[LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_DENIED)
+        {
+            Log.i(TAG, "permission request has been denied.")
+            _viewModel.showSnackBar.postValue(getString(R.string.permission_denied_explanation))
         } else {
-            if (accessFinePermissionGranted
-            ) {
-                Log.i("SelectLocationFragment", "setting isMyLocationEnabled to true.")
+            Log.i(TAG, "permission request has been approved.")
+            checkDeviceLocationSettingsAndEnableMyLocation()
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun checkDeviceLocationSettingsAndEnableMyLocation(resolve:Boolean = true){
+        Log.d(TAG, "checkDeviceLocationSettingsAndStartGoogleMap called.")
+        val locationRequest = LocationRequest.create().apply {
+            priority = LocationRequest.PRIORITY_LOW_POWER
+        }
+        val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
+        val settingsClient = LocationServices.getSettingsClient(requireActivity())
+        val locationSettingsResponseTask =
+            settingsClient.checkLocationSettings(builder.build())
+        locationSettingsResponseTask.addOnFailureListener { exception ->
+            if (exception is ResolvableApiException && resolve){
+                try {
+                    exception.startResolutionForResult(requireActivity(),
+                        REQUEST_TURN_DEVICE_LOCATION_ON)
+                } catch (sendEx: IntentSender.SendIntentException) {
+                    Log.d(TAG, "Error getting location settings resolution: " + sendEx.message)
+                }
+            } else {
+                _viewModel.showSnackBar.postValue(getString(R.string.location_required_error))
+            }
+        }
+        locationSettingsResponseTask.addOnCompleteListener {
+            if ( it.isSuccessful ) {
+                Log.i(TAG, "setting isMyLocationEnabled to true.")
                 map.isMyLocationEnabled = true
             }
         }
     }
 
-    private fun requestBackgroundPermission() {
-        ActivityCompat.requestPermissions(
-            requireActivity(),
-            arrayOf<String>(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
-            REQUEST_CODE_BACKGROUND_LOCATION
-        )
+    /*
+ *  Determines whether the app has the appropriate permissions across Android 10+ and all other
+ *  Android versions.
+ */
+    @TargetApi(29)
+    private fun foregroundLocationPermissionApproved(): Boolean {
+        Log.d(TAG, "foregroundAndBackgroundLocationPermissionApproved called.")
+        return (
+                PackageManager.PERMISSION_GRANTED ==
+                        ActivityCompat.checkSelfPermission(
+                            requireContext(),
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        ))
     }
 
-    private fun requestAccessFinePermission() {
-        ActivityCompat.requestPermissions(
-            requireActivity(),
-            arrayOf<String>(Manifest.permission.ACCESS_FINE_LOCATION),
-            REQUEST_CODE_LOCATION_PERMISSION
+    /*
+     *  Requests ACCESS_FINE_LOCATION and (on Android 10+ (Q) ACCESS_BACKGROUND_LOCATION.
+     */
+    @TargetApi(29 )
+    private fun requestForegroundLocationPermissions() {
+        Log.d(TAG, "requestForegroundAndBackgroundLocationPermissions called.")
+        if (foregroundLocationPermissionApproved())
+            return
+        val permissionsArray = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+
+        Log.i(TAG, "Requesting foreground location permission")
+        requestPermissions(
+            permissionsArray,
+            REQUEST_FOREGROUND_ONLY_PERMISSIONS_REQUEST_CODE
         )
     }
 
 }
+
+private const val REQUEST_FOREGROUND_ONLY_PERMISSIONS_REQUEST_CODE = 34
+private const val REQUEST_TURN_DEVICE_LOCATION_ON = 29
+private const val LOCATION_PERMISSION_INDEX = 0
+private const val TAG = "SelectLocationFragment"

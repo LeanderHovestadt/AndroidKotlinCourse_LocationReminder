@@ -6,19 +6,13 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.MediumTest
 import com.google.common.truth.Truth
-import com.udacity.project4.FakeReminderDao
 import com.udacity.project4.locationreminders.data.dto.ReminderDTO
 import com.udacity.project4.locationreminders.data.dto.Result
 import com.udacity.project4.util.MainCoroutineRule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runBlockingTest
 import org.hamcrest.CoreMatchers
-import org.hamcrest.CoreMatchers.`is`
-import org.hamcrest.CoreMatchers.instanceOf
-import org.hamcrest.MatcherAssert.assertThat
-import org.hamcrest.Matchers.contains
 import org.junit.*
 import org.junit.runner.RunWith
 
@@ -30,11 +24,11 @@ class RemindersLocalRepositoryTest {
 
 //    DONE: Add testing implementation to the RemindersLocalRepository.kt
 
-    private lateinit var fakeReminderDao: FakeReminderDao
+    private lateinit var reminderDao: RemindersDao
     private lateinit var remindersLocalRepository: RemindersLocalRepository
-    private lateinit var reminderOktoberfest : ReminderDTO
-    private lateinit var reminderMtbTrailsSintra : ReminderDTO
-    private lateinit var reminderMeetChristian : ReminderDTO
+    private lateinit var reminderOktoberfest: ReminderDTO
+    private lateinit var reminderMtbTrailsSintra: ReminderDTO
+    private lateinit var reminderMeetChristian: ReminderDTO
 
     @get:Rule
     var instantExecutorRule = InstantTaskExecutorRule()
@@ -44,14 +38,17 @@ class RemindersLocalRepositoryTest {
 
     @Before
     fun setup() {
-        fakeReminderDao = FakeReminderDao()
+        reminderDao = Room.inMemoryDatabaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            RemindersDatabase::class.java
+        ).build().reminderDao()
         remindersLocalRepository = RemindersLocalRepository(
-            fakeReminderDao, Dispatchers.Unconfined
+            reminderDao, Dispatchers.Unconfined
         )
     }
 
     @Before
-    fun initVariables(){
+    fun initVariables() {
         reminderOktoberfest = ReminderDTO(
             "Oktoberfest reminder",
             "Go to the Oktoberfest!",
@@ -84,55 +81,78 @@ class RemindersLocalRepositoryTest {
         remindersLocalRepository.saveReminder(reminderOktoberfest)
 
         // THEN - the local sources are called and the cache is updated
-        Truth.assertThat(fakeReminderDao.remindersServiceData.values).contains(reminderOktoberfest)
-        Truth.assertThat(fakeReminderDao.remindersServiceData.values).doesNotContain(reminderMtbTrailsSintra)
-        Truth.assertThat(fakeReminderDao.remindersServiceData.values).doesNotContain(reminderMeetChristian)
+
+        val loadedReminders = (remindersLocalRepository.getReminders() as? Result.Success)?.data
+        Assert.assertThat<List<ReminderDTO>>(
+            loadedReminders as List<ReminderDTO>,
+            CoreMatchers.notNullValue()
+        )
+        Truth.assertThat(loadedReminders.contains(reminderOktoberfest))
+        Truth.assertThat(!loadedReminders.contains(reminderMtbTrailsSintra))
+        Truth.assertThat(!loadedReminders.contains(reminderMeetChristian))
 
         // WHEN - an other reminder is saved to the tasks repository
         remindersLocalRepository.saveReminder(reminderMtbTrailsSintra)
 
         // THEN - the local sources are called and the cache is updated
-        Truth.assertThat(fakeReminderDao.remindersServiceData.values).contains(reminderOktoberfest)
-        Truth.assertThat(fakeReminderDao.remindersServiceData.values).contains(reminderMtbTrailsSintra)
-        Truth.assertThat(fakeReminderDao.remindersServiceData.values).doesNotContain(reminderMeetChristian)
+        val loadedRemindersSecond = (remindersLocalRepository.getReminders() as? Result.Success)?.data
+        Assert.assertThat<List<ReminderDTO>>(
+            loadedRemindersSecond as List<ReminderDTO>,
+            CoreMatchers.notNullValue()
+        )
+        Truth.assertThat(loadedRemindersSecond.contains(reminderOktoberfest))
+        Truth.assertThat(loadedRemindersSecond.contains(reminderMtbTrailsSintra))
+        Truth.assertThat(!loadedRemindersSecond.contains(reminderMeetChristian))
 
         // WHEN - an other reminder is saved to the tasks repository
         remindersLocalRepository.saveReminder(reminderMeetChristian)
 
         // THEN - the local sources are called and the cache is updated
-        Truth.assertThat(fakeReminderDao.remindersServiceData.values).contains(reminderOktoberfest)
-        Truth.assertThat(fakeReminderDao.remindersServiceData.values).contains(reminderMtbTrailsSintra)
-        Truth.assertThat(fakeReminderDao.remindersServiceData.values).contains(reminderMeetChristian)
+        val loadedRemindersThird = (remindersLocalRepository.getReminders() as? Result.Success)?.data
+        Assert.assertThat<List<ReminderDTO>>(
+            loadedRemindersThird as List<ReminderDTO>,
+            CoreMatchers.notNullValue()
+        )
+        Truth.assertThat(loadedRemindersThird.contains(reminderOktoberfest))
+        Truth.assertThat(loadedRemindersThird.contains(reminderMtbTrailsSintra))
+        Truth.assertThat(loadedRemindersThird.contains(reminderMeetChristian))
     }
 
     @Test
     fun getReminder_returnsCorrectReminder() = runBlockingTest {
 
         // GIVEN - there are some reminders in the Dao
-        fakeReminderDao.remindersServiceData[reminderOktoberfest.id] = reminderOktoberfest
-        fakeReminderDao.remindersServiceData[reminderMtbTrailsSintra.id] = reminderMtbTrailsSintra
-        fakeReminderDao.remindersServiceData[reminderMeetChristian.id] = reminderMeetChristian
+        remindersLocalRepository.saveReminder(reminderOktoberfest)
+        remindersLocalRepository.saveReminder(reminderMtbTrailsSintra)
+        remindersLocalRepository.saveReminder(reminderMeetChristian)
 
         // WHEN - reminder is requested by id
-        val loadedReminder = (remindersLocalRepository.getReminder(reminderOktoberfest.id) as? Result.Success)?.data
+        val loadedReminder =
+            (remindersLocalRepository.getReminder(reminderOktoberfest.id) as? Result.Success)?.data
 
         // THEN - the correct reminder has been returned
         Assert.assertThat<ReminderDTO>(loadedReminder as ReminderDTO, CoreMatchers.notNullValue())
         Assert.assertThat(loadedReminder.id, CoreMatchers.`is`(reminderOktoberfest.id))
         Assert.assertThat(loadedReminder.title, CoreMatchers.`is`(reminderOktoberfest.title))
-        Assert.assertThat(loadedReminder.description, CoreMatchers.`is`(reminderOktoberfest.description))
+        Assert.assertThat(
+            loadedReminder.description,
+            CoreMatchers.`is`(reminderOktoberfest.description)
+        )
         Assert.assertThat(loadedReminder.location, CoreMatchers.`is`(reminderOktoberfest.location))
         Assert.assertThat(loadedReminder.latitude, CoreMatchers.`is`(reminderOktoberfest.latitude))
-        Assert.assertThat(loadedReminder.longitude, CoreMatchers.`is`(reminderOktoberfest.longitude))
+        Assert.assertThat(
+            loadedReminder.longitude,
+            CoreMatchers.`is`(reminderOktoberfest.longitude)
+        )
     }
 
     @Test
     fun getReminder_withInvalidIdReturnsErrorMessage() = runBlockingTest {
 
         // GIVEN - there are some reminders in the Dao
-        fakeReminderDao.remindersServiceData[reminderOktoberfest.id] = reminderOktoberfest
-        fakeReminderDao.remindersServiceData[reminderMtbTrailsSintra.id] = reminderMtbTrailsSintra
-        fakeReminderDao.remindersServiceData[reminderMeetChristian.id] = reminderMeetChristian
+        remindersLocalRepository.saveReminder(reminderOktoberfest)
+        remindersLocalRepository.saveReminder(reminderMtbTrailsSintra)
+        remindersLocalRepository.saveReminder(reminderMeetChristian)
 
         // WHEN - reminder is requested by wrong id
         val message = (remindersLocalRepository.getReminder("anyWrongId") as? Result.Error)?.message
@@ -146,14 +166,15 @@ class RemindersLocalRepositoryTest {
     fun deleteAllReminders_willDeleteAllReminders() = runBlockingTest {
 
         // GIVEN - there are some reminders in the Dao
-        fakeReminderDao.remindersServiceData[reminderOktoberfest.id] = reminderOktoberfest
-        fakeReminderDao.remindersServiceData[reminderMtbTrailsSintra.id] = reminderMtbTrailsSintra
-        fakeReminderDao.remindersServiceData[reminderMeetChristian.id] = reminderMeetChristian
+        remindersLocalRepository.saveReminder(reminderOktoberfest)
+        remindersLocalRepository.saveReminder(reminderMtbTrailsSintra)
+        remindersLocalRepository.saveReminder(reminderMeetChristian)
 
         // WHEN - reminders are deleted
         remindersLocalRepository.deleteAllReminders()
 
         // THEN - getReminders should return empty list
-        Truth.assertThat((remindersLocalRepository.getReminders() as? Result.Success)?.data).isEmpty()
+        Truth.assertThat((remindersLocalRepository.getReminders() as? Result.Success)?.data)
+            .isEmpty()
     }
 }

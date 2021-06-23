@@ -9,10 +9,12 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
 import com.firebase.ui.auth.AuthUI
 import com.firebase.ui.auth.IdpResponse
+import com.google.android.gms.maps.SupportMapFragment
 import com.google.firebase.auth.FirebaseAuth
 import com.udacity.project4.R
 import com.udacity.project4.databinding.ActivityAuthenticationBinding
 import com.udacity.project4.locationreminders.RemindersActivity
+import com.udacity.project4.locationreminders.savereminder.selectreminderlocation.SelectLocationFragment
 
 /**
  * This class should be the starting point of the app, It asks the users to sign in / register, and redirects the
@@ -39,7 +41,6 @@ class AuthenticationActivity : AppCompatActivity() {
 //          TODO: a bonus is to customize the sign in flow to look nice using :
         //https://github.com/firebase/FirebaseUI-Android/blob/master/auth/README.md#custom-layout
     }
-
 
     private fun launchSignInFlow() {
         // Give users the option to sign in / register with their email or Google account. If users
