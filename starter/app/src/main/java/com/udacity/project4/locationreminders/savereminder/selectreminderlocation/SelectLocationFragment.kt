@@ -222,7 +222,11 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         map.setOnMapClickListener { point ->
 
             map.clear()
-            pointOfInterest = PointOfInterest(LatLng(point.latitude, point.longitude), UUID.randomUUID().toString(), "Point at %.2f/%.2f".format(point.latitude, point.longitude))
+            pointOfInterest = PointOfInterest(
+                LatLng(point.latitude, point.longitude),
+                UUID.randomUUID().toString(),
+                "Point at %.2f/%.2f".format(point.latitude, point.longitude)
+            )
 
             map.addMarker(
                 MarkerOptions()
@@ -249,7 +253,7 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         Log.d(TAG, "checkPermissionsAndStartGooglemap")
         if (foregroundLocationPermissionApproved()) {
             Log.i(TAG, "foreground and background location permission approved")
-            checkDeviceLocationSettingsAndEnableMyLocation()
+            enableMyLocation()
         } else {
             Log.i(TAG, "requesting foreground and background location permission")
             requestForegroundLocationPermissions()
@@ -269,44 +273,20 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
 
         if (
             grantResults.isEmpty() ||
-            grantResults[LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_DENIED)
-        {
+            grantResults[LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_DENIED
+        ) {
             Log.i(TAG, "permission request has been denied.")
             _viewModel.showSnackBar.postValue(getString(R.string.permission_denied_explanation))
         } else {
             Log.i(TAG, "permission request has been approved.")
-            checkDeviceLocationSettingsAndEnableMyLocation()
+            enableMyLocation()
         }
     }
 
     @SuppressLint("MissingPermission")
-    private fun checkDeviceLocationSettingsAndEnableMyLocation(resolve:Boolean = true){
-        Log.d(TAG, "checkDeviceLocationSettingsAndStartGoogleMap called.")
-        val locationRequest = LocationRequest.create().apply {
-            priority = LocationRequest.PRIORITY_LOW_POWER
-        }
-        val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
-        val settingsClient = LocationServices.getSettingsClient(requireActivity())
-        val locationSettingsResponseTask =
-            settingsClient.checkLocationSettings(builder.build())
-        locationSettingsResponseTask.addOnFailureListener { exception ->
-            if (exception is ResolvableApiException && resolve){
-                try {
-                    exception.startResolutionForResult(requireActivity(),
-                        REQUEST_TURN_DEVICE_LOCATION_ON)
-                } catch (sendEx: IntentSender.SendIntentException) {
-                    Log.d(TAG, "Error getting location settings resolution: " + sendEx.message)
-                }
-            } else {
-                _viewModel.showSnackBar.postValue(getString(R.string.location_required_error))
-            }
-        }
-        locationSettingsResponseTask.addOnCompleteListener {
-            if ( it.isSuccessful ) {
-                Log.i(TAG, "setting isMyLocationEnabled to true.")
-                map.isMyLocationEnabled = true
-            }
-        }
+    private fun enableMyLocation() {
+        Log.i(TAG, "setting isMyLocationEnabled to true.")
+        map.isMyLocationEnabled = true
     }
 
     /*
@@ -327,7 +307,7 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
     /*
      *  Requests ACCESS_FINE_LOCATION and (on Android 10+ (Q) ACCESS_BACKGROUND_LOCATION.
      */
-    @TargetApi(29 )
+    @TargetApi(29)
     private fun requestForegroundLocationPermissions() {
         Log.d(TAG, "requestForegroundAndBackgroundLocationPermissions called.")
         if (foregroundLocationPermissionApproved())
