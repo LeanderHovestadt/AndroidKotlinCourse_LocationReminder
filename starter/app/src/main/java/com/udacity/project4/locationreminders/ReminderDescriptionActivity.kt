@@ -3,6 +3,7 @@ package com.udacity.project4.locationreminders
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
 import com.udacity.project4.R
@@ -16,6 +17,7 @@ class ReminderDescriptionActivity : AppCompatActivity() {
 
     companion object {
         private const val EXTRA_ReminderDataItem = "EXTRA_ReminderDataItem"
+        private const val TAG = "ReminderDescriptionActivity"
 
         //        receive the reminder object after the user clicks on the notification
         fun newIntent(context: Context, reminderDataItem: ReminderDataItem): Intent {
@@ -33,12 +35,18 @@ class ReminderDescriptionActivity : AppCompatActivity() {
             R.layout.activity_reminder_description
         )
 //        TODO: Add the implementation of the reminder details
+        Log.d(TAG, "onCreate called")
 
         if(intent != null) {
+            Log.i(TAG, "recieved intent")
             val reminderDataItem: ReminderDataItem? =
                 intent.extras?.getSerializable(EXTRA_ReminderDataItem) as ReminderDataItem?
+
             if (reminderDataItem != null)
+            {
+                Log.i(TAG, "reminderDataItem has been parsed")
                 binding.reminderDataItem = reminderDataItem
+            }
         }
     }
 }

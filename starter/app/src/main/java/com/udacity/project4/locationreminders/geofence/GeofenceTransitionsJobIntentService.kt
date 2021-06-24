@@ -27,6 +27,7 @@ class GeofenceTransitionsJobIntentService : JobIntentService(), CoroutineScope {
 
         //        TODO: call this to start the JobIntentService to handle the geofencing transition events
         fun enqueueWork(context: Context, intent: Intent) {
+            Log.d(TAG, "enqueueWork is called")
             enqueueWork(
                 context,
                 GeofenceTransitionsJobIntentService::class.java, JOB_ID,
@@ -36,6 +37,7 @@ class GeofenceTransitionsJobIntentService : JobIntentService(), CoroutineScope {
     }
 
     override fun onHandleWork(intent: Intent) {
+        Log.d(TAG, "onHandleWork is called")
         //TODO: handle the geofencing transition events and
         // send a notification to the user when he enters the geofence area
         val geofencingEvent = GeofencingEvent.fromIntent(intent)
@@ -48,6 +50,8 @@ class GeofenceTransitionsJobIntentService : JobIntentService(), CoroutineScope {
     //TODO: get the request id of the current geofence
     private fun sendNotification(triggeringGeofences: List<Geofence>) {
 
+        Log.d(TAG, "sendNotification is called")
+
         if (triggeringGeofences.isEmpty()) {
             Log.w(TAG, "triggeringGeofences list is empty.")
             return
@@ -56,15 +60,19 @@ class GeofenceTransitionsJobIntentService : JobIntentService(), CoroutineScope {
         for (geofence in triggeringGeofences) {
             val requestId = geofence.requestId
 
+            Log.i(TAG, "sending notification for id $requestId")
+
             // Get the local repository instance
             val remindersLocalRepository: RemindersLocalRepository by inject()
             // Interaction to the repository has to be through a coroutine scope
             CoroutineScope(coroutineContext).launch(SupervisorJob()) {
                 //get the reminder with the request id
                 val result = remindersLocalRepository.getReminder(requestId)
+                Log.d(TAG, "received result from remindersLocalRepository")
                 if (result is Result.Success<ReminderDTO>) {
                     val reminderDTO = result.data
                     //send a notification to the user with the reminder details
+                    Log.d(TAG, "sending out notification")
                     sendNotification(
                         this@GeofenceTransitionsJobIntentService, ReminderDataItem(
                             reminderDTO.title,

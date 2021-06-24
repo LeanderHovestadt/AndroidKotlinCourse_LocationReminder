@@ -20,6 +20,7 @@ import com.google.android.gms.location.GeofencingEvent
 class GeofenceBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
 
+        Log.d("GeofenceBroadcastReceiver", "onReceive is called.")
 //TODO: implement the onReceive method to receive the geofencing events at the background
         val geofenceEvent = GeofencingEvent.fromIntent(intent)
         if (geofenceEvent.hasError()) {
@@ -27,6 +28,7 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
             return
         }
 
+        Log.d("GeofenceBroadcastReceiver", "geofence transition is ${geofenceEvent.geofenceTransition}.")
         when (geofenceEvent.geofenceTransition) {
             Geofence.GEOFENCE_TRANSITION_ENTER -> {
                 GeofenceTransitionsJobIntentService.enqueueWork(context, intent)

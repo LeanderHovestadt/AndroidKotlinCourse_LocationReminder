@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Parcelable
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -28,6 +29,7 @@ import com.udacity.project4.databinding.FragmentSaveReminderBinding
 import com.udacity.project4.locationreminders.geofence.GeofenceBroadcastReceiver
 import com.udacity.project4.locationreminders.reminderslist.ReminderDataItem
 import com.udacity.project4.utils.setDisplayHomeAsUpEnabled
+import kotlinx.android.parcel.Parcelize
 import org.koin.android.ext.android.inject
 import java.util.*
 
@@ -44,7 +46,8 @@ class SaveReminderFragment : BaseFragment() {
             android.os.Build.VERSION_CODES.Q
 
     // used to save the requested geofence
-    data class GeofenceData(val title: String, val description: String, val location: String, val latLng: LatLng, val radius: Float, val id: String)
+    @Parcelize
+    data class GeofenceData(val title: String, val description: String, val location: String, val latLng: LatLng, val radius: Float, val id: String) : Parcelable
     private var pendingGeofence: GeofenceData? = null
 
     override fun onCreateView(
@@ -213,7 +216,8 @@ class SaveReminderFragment : BaseFragment() {
                         geofenceData.description,
                         geofenceData.location,
                         geofenceData.latLng.latitude,
-                        geofenceData.latLng.longitude
+                        geofenceData.latLng.longitude,
+                        geofenceData.id
                     )
                 )
 
